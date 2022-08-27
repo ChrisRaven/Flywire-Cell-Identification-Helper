@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cell Identification Helper
 // @namespace    KrzysztofKruk-FlyWire
-// @version      0.1
+// @version      0.1.1
 // @description  Helps typing in neurons' names
 // @author       Krzysztof Kruk
 // @match        https://ngl.flywire.ai/*
@@ -110,7 +110,7 @@ function addCode() {
 function generateHtmlList() {
   const list = [
     ['Centrifugal', 'C'],
-    ['Distall medulla', 'Dm'],
+    ['Distal medulla', 'Dm'],
     ['Lamina monopolar', 'L'],
     ['Lamina wide field', 'Lawf'],
     ['Lobula columnar', 'Lc'],
