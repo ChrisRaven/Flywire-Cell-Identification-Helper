@@ -101,9 +101,9 @@ function addCode() {
     </div>
   `
 
-  if (textarea) {
-    textarea.insertAdjacentHTML('beforebegin', html)
-  }
+  if (!textarea) return
+
+  textarea.insertAdjacentHTML('beforebegin', html)
 
   addEvents()
   addCss()
