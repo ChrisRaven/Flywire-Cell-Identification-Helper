@@ -247,7 +247,10 @@ function changeName() {
 
 
 function clearFields() {
-  document.getElementById('kk-cih-selection').selectedIndex = -1
+  const selection = document.getElementById('kk-cih-selection')
+  if (!selection) return
+
+  selection.selectedIndex = -1
   document.getElementById('kk-cih-digit-grid-result').value = ''
   document.getElementById('kk-cih-putative').checked = false
   longName = ''
