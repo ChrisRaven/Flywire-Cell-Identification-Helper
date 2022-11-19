@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cell Identification Helper
 // @namespace    KrzysztofKruk-FlyWire
-// @version      0.1.2
+// @version      0.1.3
 // @description  Helps typing in neurons' names
 // @author       Krzysztof Kruk
 // @match        https://ngl.flywire.ai/*
@@ -118,7 +118,8 @@ function generateHtmlList() {
     ['Lamina monopolar', 'L'],
     ['Lamina wide field', 'Lawf'],
     ['Lobula columnar', 'Lc'],
-    ['Lobula-complex columnar', 'Lccn'],
+    ['Lobula-lobula plate columnar', 'LLPC'],
+    ['Lobula plate-lobula columnar', 'LPLC'],
     ['Lobula intrinsic', 'Li'],
     ['Lobula plate intrinsic', 'Lpi'],
     ['Lobula tangential', 'Lt'],
