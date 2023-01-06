@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cell Identification Helper
 // @namespace    KrzysztofKruk-FlyWire
-// @version      0.2
+// @version      0.2.1
 // @description  Helps typing in neurons' names
 // @author       Krzysztof Kruk
 // @match        https://ngl.flywire.ai/*
@@ -114,7 +114,7 @@ function main() {
   function fillIdentifierDialog() {
     document.getElementById('kk-identifier-current-label').value = currentLabel || ''
     
-    if (!Object.keys(entries).length) return
+    if (!entries || !Object.keys(entries).length) return
 
     let html = /*html*/`<tr><th>ROOT ID</th><th>COORDS</th><th>LABEL</th><th>ACTIONS</th><th>STATUS</th></tr>`
 
