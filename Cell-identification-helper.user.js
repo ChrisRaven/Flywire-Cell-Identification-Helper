@@ -1,11 +1,14 @@
 // ==UserScript==
 // @name         Cell Identification Helper
 // @namespace    KrzysztofKruk-FlyWire
-// @version      0.1.3
+// @version      0.2
 // @description  Helps typing in neurons' names
 // @author       Krzysztof Kruk
 // @match        https://ngl.flywire.ai/*
-// @grant        none
+// @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
+// @connect      services.itanna.io
+// @connect      prod.flywire-daf.com
 // @updateURL    https://raw.githubusercontent.com/ChrisRaven/FlyWire-Cell-Identification-Helper/main/Cell-identification-helper.user.js
 // @downloadURL  https://raw.githubusercontent.com/ChrisRaven/FlyWire-cell-Identification-Helper/main/Cell-identification-helper.user.js
 // @homepageURL  https://github.com/ChrisRaven/FlyWire-Cell-Identification-Helper
@@ -19,15 +22,281 @@ if (!document.getElementById('dock-script')) {
 }
 
 let wait = setInterval(() => {
-  if (globalThis.dockIsReady) {
+  if (unsafeWindow.dockIsReady) {
+    unsafeWindow.GM_xmlhttpRequest = GM_xmlhttpRequest
     clearInterval(wait)
     main()
   }
 }, 100)
 
+let userId
+
+let storage
+let entries = {}
+let currentLabel = ''
+
+
+function save(label, values) {
+  storage.set(label, { value: values })
+}
+
+function get(label, callback) {
+  storage.get(label).then(res => {
+    const content = res[label]
+
+    callback(content)
+  })
+}
+
 
 function main() {
+  storage = unsafeWindow.Sifrr.Storage.getStorage('indexeddb')
+
   let checkClose
+
+  // getting the userId
+  fetch('https://global.daf-apis.com/auth/api/v1/user/me?middle_auth_token=' + localStorage.getItem('auth_token'))
+    .then(res => res.json())
+    .then(data => userId = data.id)
+
+  get('kk-identifier', ents => entries = ents)
+  get('kk-identifier-label', label => currentLabel = label)
+
+  let dock = new Dock()
+
+  const addedIdentificator = document.createElement('div')
+  addedIdentificator.id = 'kk-identifier-added-identificator'
+  addedIdentificator.classList.add('kk-added-identificator-hidden')
+  document.body.appendChild(addedIdentificator)
+
+  dock.addAddon({
+    name: 'Identifier',
+    id: 'kk-cell-identification-helper',
+    html: generateHtml(),
+    events: {
+      '#kk-identifier-get-cells': {
+        click: getCells
+      }
+    }
+  })
+
+  function generateHtml() {
+    return /*html*/`
+      <button id="kk-identifier-get-cells">Get cells</button>
+    `
+  }
+
+  function getCells() {
+    Dock.dialog({
+      id: 'kk-identifier-get-cells-dialog',
+      okLabel: 'Close',
+      width: 1150,
+      okCallback: () => {},
+      html: getCellsDialogContent(),
+      afterCreateCallback: () => { fillIdentifierDialog(); addIdentifierDialogEvents() },
+      destroyAfterClosing: true
+    }).show()
+  }
+
+  function getCellsDialogContent() {
+    return /*html*/`
+      <div>Current label: <input type="text" id="kk-identifier-current-label"><button id="kk-identifier-label-save">Save</button></div>
+      <div>
+        <button id="kk-identifier-submit-all">Submit all</button>
+        <button id="kk-identifier-clear-all">Clear all</button>
+      </div>
+      <div id="kk-identifier-cells-table-wrapper">
+        <table id="kk-identifier-cells-table"></table>
+      </div>
+    `
+  }
+
+  function fillIdentifierDialog() {
+    document.getElementById('kk-identifier-current-label').value = currentLabel || ''
+    
+    if (!Object.keys(entries).length) return
+
+    let html = /*html*/`<tr><th>ROOT ID</th><th>COORDS</th><th>LABEL</th><th>ACTIONS</th><th>STATUS</th></tr>`
+
+    Object.entries(entries).forEach(entry => {
+      entry = entry[1]
+
+      let coords = entry.coords.map(en => {
+        return Math.floor(en)
+      })
+
+      html += /*html*/`<tr id="kk-identifier-entry-${entry.id}" data-id="${entry.id}" class="kk-identifier-cells-table-row">
+          <td class="id">${entry.id}</td>
+          <td class="coords">(${coords.join(', ')})</td>
+          <td class="label">${entry.label}</td>
+          <td class="actions">
+            <button class="kk-identifier-submit">Submit</button>
+            <button class="kk-identifier-edit">Edit</button>
+            <button class="kk-identifier-remove">Remove</button>
+            <button class="kk-identifier-jump">Jump to</button>
+          </td>
+          <td class="status">
+        </tr>`
+    })
+
+    document.getElementById('kk-identifier-cells-table').innerHTML = html
+  }
+
+  function addIdentifierDialogEvents() {
+    document.getElementById('kk-identifier-label-save').addEventListener('click', e => {
+      const labelField = document.getElementById('kk-identifier-current-label')
+      const newLabel = labelField.value
+      if (newLabel) {
+        currentLabel = newLabel
+        save('kk-identifier-label', currentLabel)
+      }
+      else {
+        labelField.value = currentLabel || ''
+      }
+    })
+
+    document.getElementById('kk-identifier-submit-all').addEventListener('click', () => {
+      identifierSubmitAll()
+    })
+
+    document.getElementById('kk-identifier-clear-all').addEventListener('click', () => {
+      identifierClearAll()
+    })
+
+    document.getElementById('kk-identifier-cells-table').addEventListener('click', e => {
+      switch (e.target.className) {
+        case 'kk-identifier-submit': identifierSubmitCell(e.target); break
+        case 'kk-identifier-edit': identifierEditCell(e.target); break
+        case 'kk-identifier-remove': identifierRemoveCell(e.target); break
+        case 'kk-identifier-jump': identifierJumpToCell(e.target); break
+      }
+    })
+
+    function identifierSubmitCell(row) {
+      const parent = row.parentElement.parentElement
+      const id = parent.dataset.id
+      const coords = entries[id].coords
+      const label = entries[id].label
+      const authToken = localStorage.getItem('auth_token')
+      const statusTableCell = parent.getElementsByClassName('status')[0]
+
+      const url = `https://prod.flywire-daf.com/neurons/api/v1/submit_cell_identification?valid_id=${id}&submit=1&location=${
+        coords.join(',')}&tag=${encodeURIComponent(label)}`
+
+      let status = 'Submitting...'
+      statusTableCell.style.color = '#FFF'
+      let options = {}
+      options.method = 'POST'
+      options.url = url
+      options.cookie = 'middle_auth_token=' + authToken
+      options.onload = function(response) {
+        if (response.responseText.includes('Submitted successfully')) {
+          status = 'Success'
+          statusTableCell.style.color = '#0F0'
+          delete entries[id]
+          save('kk-identifier', entries)
+
+          setTimeout(() => {
+            parent.remove()
+          }, 1000)
+        }
+        else {
+          status = 'Error'
+          statusTableCell.style.color = '#F00'
+        }
+
+        statusTableCell.textContent = status
+      }
+
+      statusTableCell.textContent = status
+
+      GM_xmlhttpRequest(options)
+      
+    }
+
+    function identifierEditCell(row) {
+      const parent = row.parentElement.parentElement
+      const id = parent.dataset.id
+      const oldName = entries[id].label
+
+      Dock.dialog({
+        id: 'kk-identifier-edit-cell',
+        html: `<input id="kk-identifier-edit-cell-name" value="${oldName}">`,
+        okCallback: saveLabel,
+        okLabel: 'Save',
+        cancelCallback: () => {},
+        destroyAfterClosing: true
+      }).show()
+
+      function saveLabel() {
+        const newLabel = document.getElementById('kk-identifier-edit-cell-name').value
+
+        if (!newLabel) {
+          Dock.dialog({
+            id: 'kk-identifier-edit-cell-error',
+            html: 'Label cannot be empty',
+            cancelLabel: 'Close',
+            cancelCallback: () => {},
+            destroyAfterClosing: true
+          }).show()
+        }
+        else {
+          parent.getElementsByClassName('label')[0].textContent = newLabel
+          entries[id].label = newLabel
+          save('kk-identifier', entries)
+        }
+      }
+    }
+
+    function identifierRemoveCell(row) {
+      const tableRow = row.parentElement.parentElement
+      const id = tableRow.dataset.id
+
+      Dock.dialog({
+        id: 'kk-identifier-remove-cell',
+        html: `<center>Are you sure, you want to remove entry for cell ${id}</center>`,
+        okCallback: removeCell,
+        okLabel: 'Yes',
+        cancelCallback: () => {},
+        cancelLabel: 'No',
+        width: 300
+      }).show()
+
+      function removeCell() {
+        tableRow.remove()
+        delete entries[id]
+        save('kk-identifier', entries)
+      }
+    }
+
+    function identifierJumpToCell(row) {
+      const id = row.parentElement.parentElement.dataset.id
+      const coords = entries[id].coords
+
+      Dock.jumpToCoords(coords)
+    }
+
+    function identifierSubmitAll() {
+      document.getElementsByClassName('kk-identifier-submit').forEach(el => el.click())
+    }
+
+    function identifierClearAll() {
+      Dock.dialog({
+        id: 'kk-identifier-clear-all-warning',
+        html: 'Are you sure, you want to remove all the entries?',
+        okLabel: 'Yes',
+        cancelLabel: 'No',
+        okCallback: confirmed,
+        cancelCallback: () => {}
+      }).show()
+
+      function confirmed() {
+        entries = {}
+        save('kk-identifier', entries)
+        document.getElementById('kk-identifier-cells-table').remove()
+      }
+    }
+  }
 
   document.addEventListener('fetch', result => {
     if (!result.detail.url.includes('/root?')) return
@@ -61,12 +330,37 @@ function main() {
     
   })
 
+  document.addEventListener('keyup', e => {
+    if (e.key !== '/') return
+
+    Dock.getRootIdByCurrentCoords((rootId) => {
+      const coords = Dock.getCurrentCoords()
+      const identificator = document.getElementById('kk-identifier-added-identificator')
+
+      if (!rootId) return
+
+      entries[rootId] = {
+        id: rootId,
+        coords: coords,
+        label: currentLabel
+      }
+
+      save('kk-identifier', entries)
+
+      identificator.classList.remove('kk-added-identificator-hidden')
+      setTimeout(() => identificator.classList.add('kk-added-identificator-hidden'), 1000)
+    })
+    
+  })
+
   function checkForClear() {
     if (!document.getElementsByClassName('overlay-content').length) {
       clearInterval(checkClose)
       wasClosed = true
     }
   }
+
+  addCss()
 }
 
 
@@ -106,7 +400,6 @@ function addCode() {
   textarea.insertAdjacentHTML('beforebegin', html)
 
   addEvents()
-  addCss()
 }
 
 
@@ -329,6 +622,82 @@ function addCss() {
     margin-bottom: 20px;
     display: inline-block;
   }
+
+  #kk-identifier-get-cells-dialog {
+    height: 80vh;
+  }
+
+  #kk-identifier-cells-table-wrapper {
+    height: 60vh;
+    overflow-y: auto;
+  }
+
+  #kk-identifier-cells-table {
+    font-size: 12px;
+  }
+
+  #kk-identifier-cells-table tr:nth-child(1) {
+    top: 0;
+    position: sticky;
+    background-color: #222;
+    box-shadow: 0 2px 2px -1px rgb(0 0 0 / 40%);
+  }
+
+  .kk-identifier-cells-table-row td {
+    padding: 0 10px;
+  }
+
+  .kk-identifier-cells-table-row .coords {
+    width: 160px;
+  }
+
+  .kk-identifier-cells-table-row .label {
+    width: 300px;
+  }
+
+  .kk-identifier-cells-table-row .actions {
+    width: 325px;
+    text-align: center;
+  }
+
+  .kk-identifier-cells-table-row .status {
+    width: 120px;
+  }
+
+  .kk-identifier-cells-table-row:nth-child(even) {
+    background-color: #333;
+  }
+
+  .content > div > input#kk-identifier-current-label {
+    width: 300px;
+    margin: 20px;
+  }
+
+  .content > div > button#kk-identifier-submit-all,
+  .content > div > button#kk-identifier-clear-all {
+    width: 80px;
+    margin-bottom: 10px;
+  }
+
+  #kk-identifier-added-identificator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    margin: 0;
+    width: 20px;
+    height: 20px;
+    background-color: #0F0;
+    z-index: 30;
+  }
+
+  .kk-added-identificator-hidden {
+    display: none;
+  }
+
+  .kk-added-identificator-error {
+    background-color: #F00;
+  }
+
   `
 
   document.head.appendChild(style)
