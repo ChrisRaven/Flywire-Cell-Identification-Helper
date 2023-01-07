@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cell Identification Helper
 // @namespace    KrzysztofKruk-FlyWire
-// @version      0.2.1.2
+// @version      0.2.2
 // @description  Helps typing in neurons' names
 // @author       Krzysztof Kruk
 // @match        https://ngl.flywire.ai/*
@@ -332,6 +332,8 @@ function main() {
 
   document.addEventListener('keyup', e => {
     if (e.key !== '/' && e.key !== '-') return
+    if (e.target.tagName === 'TEXTAREA') return
+    if ((e.target.tagName === 'INPUT') && ['text', 'password', 'email', 'number'].contains(e.target.type)) return
 
     Dock.getRootIdByCurrentCoords((rootId) => {
       const coords = Dock.getCurrentCoords()
