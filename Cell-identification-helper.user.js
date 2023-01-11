@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cell Identification Helper
 // @namespace    KrzysztofKruk-FlyWire
-// @version      0.2.2
+// @version      0.2.3
 // @description  Helps typing in neurons' names
 // @author       Krzysztof Kruk
 // @match        https://ngl.flywire.ai/*
@@ -59,7 +59,7 @@ function main() {
     .then(res => res.json())
     .then(data => userId = data.id)
 
-  get('kk-identifier', ents => entries = ents)
+  get('kk-identifier', ents => entries = (!entries || !entries.value) ? {} : ents)
   get('kk-identifier-label', label => currentLabel = label)
 
   let dock = new Dock()
