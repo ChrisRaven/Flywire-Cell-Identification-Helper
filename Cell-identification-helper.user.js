@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Cell Identification Helper
 // @namespace    KrzysztofKruk-FlyWire
-// @version      0.2.3.3
+// @version      0.2.3.4
 // @description  Helps typing in neurons' names
 // @author       Krzysztof Kruk
 // @match        https://ngl.flywire.ai/*
-// @match        https://proofreading.flywire.ai/*
+// @match        https://edit.flywire.ai/*
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
 // @connect      services.itanna.io
