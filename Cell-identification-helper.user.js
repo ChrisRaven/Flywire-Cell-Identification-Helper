@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cell Identification Helper
 // @namespace    KrzysztofKruk-FlyWire
-// @version      0.2.3.4
+// @version      0.2.4
 // @description  Helps typing in neurons' names
 // @author       Krzysztof Kruk
 // @match        https://ngl.flywire.ai/*
@@ -679,7 +679,7 @@ function addCss() {
   }
 
   .content > div > input#kk-identifier-current-label {
-    width: 300px;
+    width: 600px;
     margin: 20px;
   }
 
