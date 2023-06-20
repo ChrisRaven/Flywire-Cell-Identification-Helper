@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cell Identification Helper
 // @namespace    KrzysztofKruk-FlyWire
-// @version      0.2.4
+// @version      0.3
 // @description  Helps typing in neurons' names
 // @author       Krzysztof Kruk
 // @match        https://ngl.flywire.ai/*
@@ -101,7 +101,11 @@ function main() {
       width: 1150,
       okCallback: () => {},
       html: getCellsDialogContent(),
-      afterCreateCallback: () => { fillIdentifierDialog(); addIdentifierDialogEvents() },
+      afterCreateCallback: () => {
+        fillIdentifierDialog()
+        addIdentifierDialogEvents()
+        updateNumberOfEnrtries()
+      },
       destroyAfterClosing: true
     }).show()
   }
@@ -112,6 +116,8 @@ function main() {
       <div>
         <button id="kk-identifier-submit-all">Submit all</button>
         <button id="kk-identifier-clear-all">Clear all</button>
+        <button id="kk-identifier-copy-ids">Copy IDs</button>
+        <span>Number of entries: <span id="kk-identifier-entries-counter">0</span></span>
       </div>
       <div id="kk-identifier-cells-table-wrapper">
         <table id="kk-identifier-cells-table"></table>
@@ -150,6 +156,11 @@ function main() {
     document.getElementById('kk-identifier-cells-table').innerHTML = html
   }
 
+  function updateNumberOfEnrtries() {
+    const numberOfEntries = document.querySelectorAll('#kk-identifier-cells-table .id').length
+    document.getElementById('kk-identifier-entries-counter').textContent = numberOfEntries
+  }
+
   function addIdentifierDialogEvents() {
     document.getElementById('kk-identifier-label-save').addEventListener('click', e => {
       const labelField = document.getElementById('kk-identifier-current-label')
@@ -169,6 +180,24 @@ function main() {
 
     document.getElementById('kk-identifier-clear-all').addEventListener('click', () => {
       identifierClearAll()
+      updateNumberOfEnrtries()
+    })
+
+    document.getElementById('kk-identifier-copy-ids')?.addEventListener('click', () => {
+      const ids = []
+      document.querySelectorAll('#kk-identifier-cells-table .id').forEach(id => {
+        ids.push(id.textContent)
+      })
+
+      navigator.clipboard.writeText(ids.join(',')).then(() => {
+        Dock.dialog({
+          id: 'kk-identifier-ids-copied-to-clipboard-dialog',
+          html: 'IDs have been copied to the clipboard',
+          okLabel: 'OK',
+          okCallback: () => {},
+          destroyAfterClose: true
+        }).show()
+      })
     })
 
     document.getElementById('kk-identifier-cells-table').addEventListener('click', e => {
@@ -206,6 +235,7 @@ function main() {
 
           setTimeout(() => {
             parent.remove()
+            updateNumberOfEnrtries()
           }, 1000)
         }
         else {
@@ -274,6 +304,7 @@ function main() {
         tableRow.remove()
         delete entries[id]
         save('kk-identifier', entries)
+        updateNumberOfEnrtries()
       }
     }
 
@@ -302,6 +333,7 @@ function main() {
         entries = {}
         save('kk-identifier', entries)
         document.getElementById('kk-identifier-cells-table').remove()
+        updateNumberOfEnrtries()
       }
     }
   }
@@ -339,15 +371,24 @@ function main() {
   })
 
   document.addEventListener('keyup', e => {
-    if (e.key !== '/' && e.key !== '-') return
+    if (e.key !== '/' && e.key !== '-' && e.key !== '`') return
     if (e.target.tagName === 'TEXTAREA') return
     if ((e.target.tagName === 'INPUT') && ['text', 'password', 'email', 'number'].contains(e.target.type)) return
 
-    Dock.getRootIdByCurrentCoords((rootId) => {
-      const coords = Dock.getCurrentCoords()
+    
+    const coords = Dock.getCurrentCoords()
+    // coords[1] += 10
+    const mouseRootId = viewer.mouseState.pickedValue.toJSON()
+    Dock.getRootIdByCoords(...coords, (rootId) => {
       const identificator = document.getElementById('kk-identifier-added-identificator')
+      identificator.classList.remove('kk-added-identificator-hidden')
+      setTimeout(() => identificator.classList.add('kk-added-identificator-hidden'), 1000)
 
-      if (!rootId) return
+      if (!rootId || mouseRootId !== rootId) {
+        identificator.style.backgroundColor = 'red'
+        return
+      }
+      identificator.style.backgroundColor = 'lime'
 
       entries[rootId] = {
         id: rootId,
@@ -356,9 +397,6 @@ function main() {
       }
 
       save('kk-identifier', entries)
-
-      identificator.classList.remove('kk-added-identificator-hidden')
-      setTimeout(() => identificator.classList.add('kk-added-identificator-hidden'), 1000)
     })
     
   })
@@ -696,7 +734,7 @@ function addCss() {
     margin: 0;
     width: 20px;
     height: 20px;
-    background-color: #0F0;
+    background-color: lime;
     z-index: 30;
   }
 
