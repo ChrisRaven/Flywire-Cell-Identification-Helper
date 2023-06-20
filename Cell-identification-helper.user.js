@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cell Identification Helper
 // @namespace    KrzysztofKruk-FlyWire
-// @version      0.3
+// @version      0.3.1
 // @description  Helps typing in neurons' names
 // @author       Krzysztof Kruk
 // @match        https://ngl.flywire.ai/*
@@ -117,6 +117,7 @@ function main() {
         <button id="kk-identifier-submit-all">Submit all</button>
         <button id="kk-identifier-clear-all">Clear all</button>
         <button id="kk-identifier-copy-ids">Copy IDs</button>
+        <button id="kk-identifier-copy-by-label">Copy by label</button>
         <span>Number of entries: <span id="kk-identifier-entries-counter">0</span></span>
       </div>
       <div id="kk-identifier-cells-table-wrapper">
@@ -195,9 +196,76 @@ function main() {
           html: 'IDs have been copied to the clipboard',
           okLabel: 'OK',
           okCallback: () => {},
-          destroyAfterClose: true
+          destroyAfterClosing: true
         }).show()
       })
+    })
+
+    document.getElementById('kk-identifier-copy-by-label')?.addEventListener('click', () => {
+      Dock.dialog({
+        id: 'kk-identifier-copy-by-label-dialog',
+        width: 800,
+        html: getHtml(),
+        afterCreateCallback: afterCreateCallback,
+        okLabel: 'Close',
+        okCallback: () => {},
+        destroyAfterClosing: true
+      }).show()
+
+      // source: ChatGPT
+      function convertMap(map) {
+        const result = {};
+      
+        for (const [id, label] of map) {
+          if (result[label]) {
+            result[label].push(id);
+          } else {
+            result[label] = [id];
+          }
+        }
+      
+        return result;
+      }
+
+      function getHtml() {
+        const entries = document.getElementsByClassName('kk-identifier-cells-table-row')
+        const idTypeMap = new Map()
+        entries.forEach(entry => idTypeMap.set(entry.dataset.id, entry.getElementsByClassName('label')[0].textContent))
+        const typeIdMap = convertMap(idTypeMap)
+        
+        let html = /*html*/`
+          <table id="kk-identifier-groupped-labels-table">
+            <tr><th>Label</th><th>IDs</th><th>Action</th></tr>
+        `
+
+        Object.entries(typeIdMap).forEach(entry => {
+          html += `<tr><td class="label">${entry[0]}</td><td class="ids">${entry[1].join(', ')}</td><td><button class="copy">Copy</button></td></tr>`
+        })
+
+        html += '</table>'
+
+        return html
+      }
+
+      function afterCreateCallback() {
+        document.getElementById('kk-identifier-groupped-labels-table').addEventListener('click', e => {
+          if (!e.target.classList.contains('copy')) return
+
+          const row = e.target.parentNode.parentNode
+          const ids = row.getElementsByClassName('ids')[0].textContent.replace(/\s/g, '')
+          const label = row.getElementsByClassName('label')[0].textContent
+
+          navigator.clipboard.writeText(ids).then(() => {
+            Dock.dialog({
+              id: 'kk-identifier-groupped-labels-copied-dialog',
+              width: 400,
+              html: `IDs for label<span>${label}</span>have been copied to the clipboard`,
+              okLabel: 'Close',
+              okCallback: () => {}
+            }).show()
+          })
+        })
+      }
     })
 
     document.getElementById('kk-identifier-cells-table').addEventListener('click', e => {
@@ -744,6 +812,39 @@ function addCss() {
 
   .kk-added-identificator-error {
     background-color: #F00;
+  }
+
+  #kk-identifier-get-cells-dialog button#kk-identifier-copy-by-label {
+    width: 100px;
+  }
+
+  #kk-identifier-groupped-labels-table {
+    font-size: 12px;
+  }
+
+  #kk-identifier-groupped-labels-table td {
+    padding-right: 10px;
+  }
+
+  #kk-identifier-groupped-labels-table td:nth-child(1) {
+    width: 400px;
+    max-width: 400px;
+  }
+
+  #kk-identifier-groupped-labels-table td:nth-child(2) {
+    width: 300px;
+    max-width: 300px;
+    overflow-wrap: anywhere;
+  }
+
+  #kk-identifier-groupped-labels-copied-dialog {
+    font-size: 12px;
+  }
+
+  #kk-identifier-groupped-labels-copied-dialog span {
+    display: block;
+    color: orange;
+    margin: 15px 0;
   }
 
   `
